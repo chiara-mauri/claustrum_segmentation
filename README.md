@@ -47,8 +47,8 @@ Additional options are also available:
 
 ## Content
 
-- [mri_claustrum_seg] (./mri_claustrum_seg) main script for segmenting claustrum
-- [atlas] (./atlas) contains the claustrum probabilistic prior in MNI152 space, as well as the high-resolution manual labels warped in MNI space, used to perform quality control
+- [mri_claustrum_seg](./mri_claustrum_seg) main script for segmenting claustrum
+- [atlas](./atlas/) contains the claustrum probabilistic prior in MNI152 space, as well as the high-resolution manual labels warped in MNI space, used to perform quality control
 - [model](./model/) contains the trained model and script for applying the model to a cropped input image
 
 ## Contact
