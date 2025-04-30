@@ -17,7 +17,7 @@ set SCRIPT_DIR = `dirname $0`
 cd $SCRIPT_DIR
 set SCRIPT_DIR = `pwd`
 cd -
-echo "script in $SCRIPT_DIR"
+
 
 
 set cdir = $SCRIPT_DIR/atlas
@@ -107,6 +107,7 @@ echo "Log file for mri_claustrum_seg" >> $LF
 date  | tee -a $LF
 echo "" | tee -a $LF
 echo "temp dir $tmpdir" | tee -a $LF
+echo "script in $SCRIPT_DIR" | tee -a $LF
 echo "setenv SUBJECTS_DIR $SUBJECTS_DIR" | tee -a $LF
 echo "cd `pwd`"  | tee -a $LF
 echo $0 $inputargs | tee -a $LF
