@@ -1,0 +1,931 @@
+#!/bin/tcsh -f
+# mri_claustrum_seg - sources
+if(-e $FREESURFER_HOME/sources.csh) then
+  source $FREESURFER_HOME/sources.csh
+endif
+
+
+#if($?SYNTHSEG38 == 0) setenv SYNTHSEG38 /autofs/space/mulan_001/users/chiara/miniforge3/envs/synthseg_38
+#set python = $SYNTHSEG38/bin/python
+set python = python
+
+set VERSION = '$Id$';
+set scriptname = `basename $0`
+
+#get the script full path
+set SCRIPT_DIR = `dirname $0`
+cd $SCRIPT_DIR
+set SCRIPT_DIR = `pwd`
+cd -
+echo "script in $SCRIPT_DIR"
+
+
+set cdir = $SCRIPT_DIR/atlas
+set mni152prior_rh = $cdir/segs.warp.claustrum.prior.nii.gz
+set mni152prior_lh = $cdir/segs.warp.claustrum.prior.lrrev.nii.gz
+set mni152crop = $cdir/segs.warp.claustrum.prior.crop10.200um.nii.gz
+set reg200um = $cdir/reg.mni152.1.0mm-to-claustrum.crop10.200um.lta 
+set reg200umlrrev = $cdir/reg.mni152.1.0mm-to-claustrum.lrrev.crop10.200um.lta 
+set clrhctab = $cdir/claustrum.rh.ctab
+
+set csegdir = $SCRIPT_DIR
+set segr = $csegdir/claustrum-seg.py
+set mansubjectlist = $csegdir/subject.list.txt
+
+set MNITargetRes = 1.5mm 
+set ctab = $FREESURFER_HOME/FreeSurferColorLUT.txt
+
+set outdir = ();
+set invol = ();
+set subject = ()
+set threads = 1
+set DoStrip = 1;
+set DoTest = 0
+set DoTopoCorrection = 0
+set DoPost = 0
+set hemilist = (rh lh) #  have to do rh first with test
+set DoSurf = 0
+set ForceUpdate = 0
+set smorphdir = ()
+set manseglh = ()
+set mansegrh = ()
+set fovdir = ()
+set RequireConda = 0
+set rot = ()
+set trans = ()
+set model = $SCRIPT_DIR/model/model.h5; 
+
+set tmpdir = ();
+set cleanup = 1;
+set SaveWarp = 1
+set SaveCsv = 0
+set LF = ();
+
+set inputargs = ($argv);
+set PrintHelp = 0;
+if($#argv == 0) goto usage_exit;
+set n = `echo $argv | grep -e -help | wc -l` 
+if($n != 0) then
+  set PrintHelp = 1;
+  goto usage_exit;
+endif
+set n = `echo $argv | grep -e -version | wc -l` 
+if($n != 0) then
+  echo $VERSION
+  exit 0;
+endif
+goto parse_args;
+parse_args_return:
+goto check_params;
+check_params_return:
+
+set StartTime = `date`;
+set tSecStart = `date '+%s'`;
+set year  = `date +%Y`
+set month = `date +%m`
+set day   = `date +%d`
+set hour   = `date +%H`
+set min    = `date +%M`
+
+mkdir -p $outdir/log
+pushd $outdir > /dev/null
+set outdir = `pwd`;
+popd > /dev/null
+
+if($#tmpdir == 0) then
+  if(-dw /scratch)   set tmpdir = /scratch/tmpdir.mri_claustrum_seg.$$
+  if(! -dw /scratch) set tmpdir = $outdir/tmpdir.mri_claustrum_seg.$$
+endif
+mkdir -p $tmpdir
+
+
+# Set up log file
+if($#LF == 0) set LF = $outdir/log/mri_claustrum_seg.Y$year.M$month.D$day.H$hour.M$min.log
+if($LF != /dev/null) rm -f $LF
+echo "Log file for mri_claustrum_seg" >> $LF
+date  | tee -a $LF
+echo "" | tee -a $LF
+echo "temp dir $tmpdir" | tee -a $LF
+echo "setenv SUBJECTS_DIR $SUBJECTS_DIR" | tee -a $LF
+echo "cd `pwd`"  | tee -a $LF
+echo $0 $inputargs | tee -a $LF
+ls -l $0  | tee -a $LF
+echo "" | tee -a $LF
+cat $FREESURFER_HOME/build-stamp.txt | tee -a $LF
+echo $VERSION | tee -a $LF
+uname -a  | tee -a $LF
+echo "pid $$" | tee -a $LF
+if($?PBS_JOBID) then
+  echo "pbsjob $PBS_JOBID"  >> $LF
+endif
+if($?SLURM_JOB_ID) then
+  echo SLURM_JOB_ID $SLURM_JOB_ID >> $LF
+endif
+
+#========================================================
+
+if($#smorphdir == 0) then
+  set smorphdir = $outdir/synthmorph
+  set cmd = (fs-synthmorph-reg --i $invol --threads $threads \
+    --o $smorphdir --inv --test --mni-targ-res $MNITargetRes)
+  if($DoStrip) set cmd = ($cmd --strip-input)
+  if(! $DoTest) set cmd = ($cmd --affine-only)
+  echo fs_time $cmd | tee -a $LF
+  $cmd | tee -a $LF
+  if($status) goto error_exit
+else
+  pushd $outdir
+  ln -s $smorphdir synthmorph
+  popd
+endif
+
+set mnilinreg = $smorphdir/reg.targ_to_invol.lta
+set mninonlinreg = $smorphdir/warp.to.mni152.$MNITargetRes.1.0mm.nii.gz
+set mninonlininvreg = $smorphdir/warp.to.mni152.$MNITargetRes.1.0mm.inv.nii.gz
+
+foreach hemi ($hemilist)
+  set clctab = $cdir/claustrum.$hemi.ctab
+  if($hemi == lh ) then
+    set mniprior = $mni152prior_lh
+    set ClaustrumSegId = 138
+    set manseg = $manseglh
+  endif
+  if($hemi == rh ) then
+    set mniprior = $mni152prior_rh
+    set ClaustrumSegId = 139
+    set manseg = $mansegrh
+  endif
+
+  if($#fovdir == 0) then
+    # First, map the prior to the volume with linear reg
+    set prior = $outdir/claustrum.prior.$hemi.nii.gz
+    set ud = `UpdateNeeded $prior $mnilinreg`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_vol2vol --reg $mnilinreg --mov $mniprior --o $prior)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+    # Create a FoV by cropping to 60mm3 (56mm = 160*0.35mm, add 4mm for
+    # room).  It can stay at native resolution because the segmenter
+    # will upsample it to 350um
+    set cropvol = $outdir/$hemi.crop.nii.gz
+    set ud = `UpdateNeeded $cropvol $prior`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_mask -T .001 -crop-to-fov-mm 60 60 60 $invol $prior $cropvol)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+  else
+    set cropvol = $fovdir/$hemi.crop.nii.gz
+  endif
+
+  # Map the input to this FoV
+  set involcrop = $outdir/invol.$hemi.crop.nii.gz
+  set ud = `UpdateNeeded $involcrop $cropvol $invol`
+  if($ud || $ForceUpdate) then
+    set cmd = (mri_vol2vol --regheader --mov $invol --targ $cropvol --o $involcrop)
+    if($#rot)   set cmd = ($cmd --rot $rot)
+    if($#trans) set cmd = ($cmd --trans $trans)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+
+  # Set the output seg name
+  set seg  = $tmpdir/seg.$hemi.mgz
+  set post = $tmpdir/seg.$hemi.post.mgz
+  # If this is the lh, have to lrrev
+  if($hemi == lh) then
+    set involcroplrrev = $tmpdir/invol.$hemi.crop.lrrev.nii.gz
+    set ud = `UpdateNeeded $involcroplrrev $involcrop`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_convert $involcrop --left-right-reverse-pix $involcroplrrev)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+    set involcrop = $involcroplrrev
+    set seg = $tmpdir/seg.$hemi.lrrev.mgz
+    set post = $tmpdir/seg.$hemi.post.lrrev.mgz
+  endif
+  # Now segment
+  set ud = `UpdateNeeded $seg $involcrop`
+  if($ud || $ForceUpdate) then
+    set csv = $outdir/seg.$hemi.vol.csv
+    set cmd = ($python $segr --i $involcrop --o $seg --threads $threads)
+    if($#model) set cmd = ($cmd --model $model)
+    if($DoPost) set cmd = ($cmd --post $post)
+    if($SaveCsv) set cmd = ($cmd --csv $csv)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF	
+    if($status) goto error_exit
+    # Add colortable
+    set cmd = (mri_convert --ctab $ctab $seg $seg)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+  # Left-right reverse things back if this is lh
+  if($hemi == lh) then
+    set seglrrev  = $tmpdir/seg.$hemi.lrrev.mgz
+    set seg  = $tmpdir/seg.$hemi.mgz
+    set ud = `UpdateNeeded $seg $seglrrev`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_convert $seglrrev --left-right-swap-label --left-right-reverse-pix $seg)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+    if($DoPost) then
+      set postlrrev = $tmpdir/seg.$hemi.post.lrrev.mgz
+      set post = $tmpdir/seg.$hemi.post.mgz
+      set ud = `UpdateNeeded $post $postlrrev`
+      if($ud || $ForceUpdate) then
+        set cmd = (mri_convert $postlrrev --left-right-reverse-pix $post)
+        echo $cmd | tee -a $LF
+        $cmd | tee -a $LF
+        if($status) goto error_exit
+      endif
+    endif
+  endif
+
+  if($DoPost) then
+      set postSave = $outdir/claustrum.$hemi.post.mgz
+      set ud = `UpdateNeeded $post $postSave`
+      if($ud || $ForceUpdate) then
+        set cmd = (mri_convert --frame 19 $post $postSave)
+        echo $cmd | tee -a $LF
+        $cmd | tee -a $LF
+        if($status) goto error_exit
+      endif
+  endif
+   
+
+  # Compute dice against a passed manual segumentation
+  if(($hemi == lh && $#manseglh) || ($hemi == rh && $#mansegrh)) then
+    # resample manseg into space of autoseg (may not always be necessary)
+    set manseglocal = $outdir/manseg.$hemi.mgz
+    set ud = `UpdateNeeded $manseglocal $manseg`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_vol2vol --mov $manseg --targ $seg \
+       --o $manseglocal --interp nearest --regheader)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+    # Now compute the dice
+    set dat = $outdir/manseg.$hemi.dice.dat
+    set tbl = $outdir/manseg.$hemi.dice.tbl
+    set ud = `UpdateNeeded $dat $manseglocal $seg`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_compute_seg_overlap -dice $manseglocal $seg $clctab 1 0 $dat $tbl)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+  endif
+
+  # Make a reg from the seg space to full FoV (used to map the surface below)
+  # Note that the seg space is different than the crop space
+  set seg2invol = $outdir/seg2invol.$hemi.lta
+  set ud = `UpdateNeeded $seg2invol $seg $invol`
+  if($ud || $ForceUpdate) then
+    set cmd = (lta_convert --regheader --src $seg --trg $invol --outlta $seg2invol)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+
+  set segstats = $outdir/seg.$hemi.stats
+  set ud = `UpdateNeeded $segstats $seg`
+  if($ud || $ForceUpdate) then
+    set cmd = (mri_segstats --seg $seg --ctab-default --id $ClaustrumSegId --sum $segstats)
+    if($#subject) set cmd = ($cmd --subject $subject --etiv)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+
+  if($DoTest) then
+    # Map the prior to the volume with nonlinear reg
+    set nlprior = $outdir/claustrum.prior.$hemi.nonlin.nii.gz
+    set ud = `UpdateNeeded $nlprior $mninonlininvreg`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_convert $mniprior -at $mninonlininvreg $nlprior)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+  endif
+
+ 
+  if($DoTest) then
+    # Map the seg to the mni152 200um claustrum 
+    set seg200um = $tmpdir/seg.$hemi.200um.nii.gz
+    set seg2involwarp = $outdir/seg2invol.$hemi.lta 
+    set ud = `UpdateNeeded $seg200um $mninonlinreg $seg $seg2involwarp`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_vol2vol --gcam $seg $seg2involwarp $mninonlinreg)
+      if($hemi == rh ) set cmd = ($cmd  $reg200um)
+      if($hemi == lh ) set cmd = ($cmd  $reg200umlrrev)
+      set cmd = ($cmd 0 0 $seg200um)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+
+    if($hemi == lh) then
+      # This is a bit of a hack because the manual segs are on the right hemi,
+      # so lrrev this seg (with label swap) to make it look like it is on 
+      # the rh side
+      set seg200umlrrev = $tmpdir/seg.$hemi.200um.lrrev.nii.gz
+      set ud = `UpdateNeeded $seg200umlrrev $seg200um`
+      if($ud || $ForceUpdate) then
+        set cmd = (mri_convert --in_like $mni152crop --left-right-reverse-pix \
+           --left-right-swap-label $seg200um $seg200umlrrev)
+        echo $cmd | tee -a $LF
+        $cmd | tee -a $LF
+        if($status) goto error_exit
+      endif
+      set seg200um = $seg200umlrrev
+    endif
+
+    mkdir -p $outdir/dice
+    # Compute dice against all the manual labels in MNI space
+    @ n = 0
+    foreach s (`cat $mansubjectlist`)
+      @ n = $n + 1
+      set smanseg = $cdir/synthmorph/$s/seg.warp.mni152.200um.nii.gz
+      set dat = $outdir/dice/dice.$s.$hemi.dat
+      set tbl = $outdir/dice/dice.$s.$hemi.tbl
+      set ud = `UpdateNeeded $tbl $seg200um`
+      if($ud || $ForceUpdate) then
+        set cmd = (mri_compute_seg_overlap -dice $smanseg $seg200um $clrhctab 1 0 $dat $tbl)
+        echo $n $s `date` ================ | tee -a $LF
+        echo $cmd | tee -a $LF
+        $cmd | tee -a $LF
+        set dat = `cat $dat`
+        echo "  dice $dat"| tee -a $LF
+        if($status) goto error_exit
+      endif
+    end
+    set maxdice = $outdir/max.dice.$hemi.dat
+    set ud = `UpdateNeeded $maxdice $outdir/dice/*.$hemi.dat`
+    if($ud || $ForceUpdate) then
+      sort -nr $outdir/dice/*.$hemi.dat | head -n 1 > $maxdice
+    endif
+    echo "Max Dice $hemi `cat $maxdice`" | tee -a $LF
+  endif
+
+  # Binarize seg
+  set binvol = $outdir/claustrum.$hemi.nii.gz
+  set ud = `UpdateNeeded  $binvol $seg`
+  if($ud || $ForceUpdate) then
+    set cmd = (mri_binarize --threads $threads --i $seg  \
+        --match $ClaustrumSegId --binval $ClaustrumSegId \
+        --o $binvol)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+
+  # Binarize seg, with topology fix. This will remove islands
+  if($DoTopoCorrection) then
+    set binvol = $outdir/claustrum.$hemi.topo.corrected.nii.gz
+    set ud = `UpdateNeeded  $binvol $seg`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_binarize --threads $threads --i $seg  \
+          --match $ClaustrumSegId --binval $ClaustrumSegId \
+          --fill-holes --remove-islands  --fix-vol-topo  --o $binvol)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+  endif
+	
+	
+
+  if($DoSurf == 0) continue
+
+  # Without fixing topology
+  set surf = $outdir/$hemi.claustrum.nofix
+  set ud = `UpdateNeeded $surf $seg`
+  if($ud || $ForceUpdate) then
+    set cmd = (mri_binarize --threads $threads --i $seg  \
+      --match $ClaustrumSegId --surf $surf)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+
+  # Binarize seg, with topology fix for surf,
+  # in case we haven't already done that
+  set binvol = $outdir/claustrum.$hemi.topo.corrected.nii.gz
+
+  if( $DoTopoCorrection == 0 ) then
+    set ud = `UpdateNeeded  $binvol $seg`
+    if($ud || $ForceUpdate) then
+      set cmd = (mri_binarize --threads $threads --i $seg  \
+        --match $ClaustrumSegId --binval $ClaustrumSegId \
+        --fill-holes --remove-islands  --fix-vol-topo  --o $binvol)
+      echo $cmd | tee -a $LF
+      $cmd | tee -a $LF
+      if($status) goto error_exit
+    endif
+  endif
+
+  set surf = $outdir/$hemi.claustrum
+  set ud = `UpdateNeeded $surf $binvol`
+  if($ud || $ForceUpdate) then
+    set cmd = (mri_mc $binvol $ClaustrumSegId $surf)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+
+  # Make links to file names needed for more surf processing
+  pushd $outdir
+  ln -sf $hemi.claustrum $hemi.white
+  ln -sf $hemi.claustrum $hemi.orig
+  ln -sf $hemi.claustrum $hemi.smoothwm
+  popd
+
+  # Map the white surface to the full FoV. The ?h.white surface will 
+  # display ok in FV, but this is needed in case the surface is mapped
+  # to the mni152 through the nonlinear reg
+  set surffull = $outdir/$hemi.white.fullfov
+  set ud = `UpdateNeeded $surffull $surf $seg2invol`
+  if($ud || $ForceUpdate) then
+    set cmd = (mris_apply_reg --lta $surf $seg2invol $surffull)
+    echo $cmd | tee -a $LF
+    $cmd | tee -a $LF
+    if($status) goto error_exit
+  endif
+  # if($DoTest) then
+  #   # Map surface to the mni152 through the nonlinear reg
+  #   set surfmni = $outdir/$hemi.white.mni152
+  #   set ud = `UpdateNeeded $surfmni $surffull $mninonlininvreg`
+  #   if($ud || $ForceUpdate) then
+  #     set cmd = (mris_apply_reg --warp $surffull $mninonlininvreg $surfmni)
+  #     echo $cmd | tee -a $LF
+  #     $cmd | tee -a $LF
+  #     if($status) goto error_exit
+  #   endif
+  # endif
+
+
+  # Inflate. May need more iters for TF because many more vertices
+  set inflateiters = 10
+  set inflated = $outdir/$hemi.inflated
+  set sulc = $outdir/$hemi.sulc
+  set ud = `UpdateNeeded $inflated $surf`
+  if($ud || $ForceUpdate) then
+    # Sulc will go into same dir as $surf (the output dir)
+    set cmd = (mris_inflate -threads $threads  -n $inflateiters -sulc sulc $surf $inflated)
+    echo $cmd | tee -a $LF
+    fs_time $cmd |& tee -a $LF
+    if($status) goto error_exit
+    set udmade = 1
+  endif
+
+  foreach meas (curv) # do area for both white and pial here as well
+    set map = $outdir/$hemi.curv
+    set ud = `UpdateNeeded $map $surf`
+    if($ud || $ForceUpdate) then
+      set cmd = (mris_place_surface --$meas-map $surf 2 10 $map)
+      echo $cmd | tee -a $LF
+      fs_time $cmd |& tee -a $LF
+      if($status) goto error_exit
+    endif
+  end
+
+  set inflatedH = $outdir/$hemi.inflated.H
+  set ud = `UpdateNeeded $inflatedH $inflated`
+  if($ud || $ForceUpdate) then
+    # ?h.inflated.H will go into same dir as $inflated (the output dir)
+    set cmd = (mris_curvature -seed 1234 -thresh .999 -n -a 5 -w -distances 10 10 $inflated)
+    echo $cmd | tee -a $LF
+    fs_time $cmd |& tee -a $LF
+    if($status) goto error_exit
+    set udmade = 1
+  endif
+
+  set sphere = $outdir/$hemi.sphere
+  set ud = `UpdateNeeded $sphere $inflated`
+  if($ud || $ForceUpdate) then
+    # ?h.inflated.H will go into same dir as $inflated (the output dir)
+    set cmd = (mris_sphere -threads $threads -o $surf $inflated $sphere)
+    echo $cmd | tee -a $LF
+    fs_time $cmd |& tee -a $LF
+    if($status) goto error_exit
+    set udmade = 1
+  endif
+
+end # hemi
+
+if($DoTest && $#hemilist == 2) then
+  set seg200umlh = $tmpdir/seg.lh.200um.lrrev.nii.gz
+  set seg200umrh = $tmpdir/seg.rh.200um.nii.gz
+  set dat = $outdir/dice.lh-rh.dat
+  set tbl = $outdir/dice.lh-rh.tbl
+  set ud = `UpdateNeeded $tbl $seg200umlh $seg200umrh`
+  if($ud || $ForceUpdate) then
+    set cmd = (mri_compute_seg_overlap -dice $seg200umlh $seg200umrh $clrhctab 0 0 $dat $tbl)
+    echo $cmd | tee -a $LF
+    $cmd |& tee -a $LF
+    if($status) goto error_exit
+  endif
+  echo "InterHemi Dice `cat $dat`" | tee -a $LF
+endif
+
+
+#========================================================
+
+# Cleanup
+if($cleanup) rm -rf $tmpdir
+
+# Delete SynthMorph warps if specified, to save space
+if($SaveWarp == 0) then
+  if(-e $mninonlinreg) then
+    set cmd = (rm -f $mninonlinreg)
+    echo $cmd | tee -a $LF
+    $cmd |& tee -a $LF
+  endif
+  if(-e $mninonlininvreg) then
+    set cmd = (rm -f $mninonlininvreg)
+    echo $cmd | tee -a $LF
+    $cmd |& tee -a $LF
+  endif
+  set deformation = $smorphdir/deform.mgz
+  if(-e $deformation) then
+    set cmd = (rm -f $deformation)
+    echo $cmd | tee -a $LF
+    $cmd |& tee -a $LF
+  endif
+endif
+
+# Done
+echo " " |& tee -a $LF
+set tSecEnd = `date '+%s'`;
+@ tSecRun = $tSecEnd - $tSecStart;
+set tRunMin = `echo $tSecRun/60|bc -l`
+set tRunMin = `printf %5.2f $tRunMin`
+set tRunHours = `echo $tSecRun/3600|bc -l`
+set tRunHours = `printf %5.2f $tRunHours`
+echo "Started at $StartTime " |& tee -a $LF
+echo "Ended   at `date`" |& tee -a $LF
+echo "Mri_Claustrum_Seg-Run-Time-Sec $tSecRun" |& tee -a $LF
+echo "Mri_Claustrum_Seg-Run-Time-Min $tRunMin" |& tee -a $LF
+echo "Mri_Claustrum_Seg-Run-Time-Hours $tRunHours" |& tee -a $LF
+echo " " |& tee -a $LF
+echo "mri_claustrum_seg Done" |& tee -a $LF
+exit 0
+
+###############################################
+
+############--------------##################
+error_exit:
+echo "ERROR:"
+
+exit 1;
+###############################################
+
+############--------------##################
+parse_args:
+set cmdline = ($argv);
+while( $#argv != 0 )
+
+  set flag = $argv[1]; shift;
+  
+  switch($flag)
+
+    case "--o":
+      if($#argv < 1) goto arg1err;
+      set outdir = $argv[1]; shift;
+      breaksw
+
+    case "--i":
+      if($#argv < 1) goto arg1err;
+      set invol = $argv[1]; shift;
+      breaksw
+
+    case "--model":
+      if($#argv < 1) goto arg1err;
+      set model = $argv[1]; shift;
+      breaksw
+
+    case "--direct"
+      if($#argv < 2) goto arg2err;
+      set input = $argv[1]; shift
+      set output = $argv[1]; shift
+      set cmd = ($python $segr --i $input --o $output --threads $threads)
+      if($#model) set cmd = ($cmd --model $model)
+      #if($DoPost) set cmd = ($cmd --post $post)
+      echo $cmd
+      $cmd
+      exit $status
+
+    case "--s":
+      if($#argv < 1) goto arg1err;
+      set subject = $argv[1]; shift;
+      breaksw
+
+    case "--synthmorphdir":
+    case "--synthmorph-dir":
+    case "--smorphdir":
+      if($#argv < 1) goto arg1err;
+      set smorphdir = $argv[1]; shift;
+      if(! -e $smorphdir) then
+        echo "ERROR: cannot find $smorphdir"
+        exit 1
+      endif
+      set smorphdir = `getfullpath $smorphdir`
+      breaksw
+
+    case "--manseg-lh":
+      if($#argv < 1) goto arg1err;
+      set manseglh = $argv[1]; shift
+      if(! -e $manseglh) then
+        echo "ERROR: cannot find $manseglh"
+        exit 1
+      endif
+      set manseglh = `getfullpath $manseglh`
+      breaksw
+
+    case "--manseg-rh":
+      if($#argv < 1) goto arg1err;
+      set mansegrh = $argv[1]; shift
+      if(! -e $mansegrh) then
+        echo "ERROR: cannot find $mansegrh"
+        exit 1
+      endif
+      set mansegrh = `getfullpath $mansegrh`
+      breaksw
+
+    case "--threads":
+      if($#argv < 1) goto arg1err;
+      set threads = $argv[1]; shift;
+      breaksw
+
+    case "--fovdir":
+      if($#argv < 1) goto arg1err;
+      set fovdir = $argv[1]; shift;
+      breaksw
+
+    case "--strip":
+     set DoStrip = 1
+     breaksw
+    case "--no-strip":
+     set DoStrip = 0
+     breaksw
+
+    case "--lh":
+     set hemilist = (lh)
+     breaksw
+    case "--rh":
+     set hemilist = (rh)
+     breaksw
+
+    case "--surf":
+     set DoSurf = 1
+     breaksw
+    case "--no-surf":
+     set DoSurf = 0
+     breaksw
+
+    case "--post":
+     set DoPost = 1
+     breaksw
+    case "--no-post":
+     set DoPost = 0
+     breaksw
+
+    case "--qc":
+     set DoTest = 1
+     breaksw
+    case "--no-qc":
+     set DoTest = 0
+     breaksw
+
+    case "--topo-correct":
+     set DoTopoCorrection = 1
+     breaksw
+    case "--no-topo-correct":
+     set DoTopoCorrection = 0
+     breaksw
+
+    case "--no-conda":
+     set RequireConda = 0
+     breaksw
+
+    case "--mni-1.5":
+      set MNITargetRes = 1.5mm
+      breaksw
+    case "--mni-1.0":
+      set MNITargetRes = 1.0mm
+      breaksw
+
+    case "--rot":
+      if($#argv < 3) goto arg3err;
+      set rot = ($argv[1] $argv[2] $argv[3]); shift;shift;shift;
+      breaksw
+    case "--trans":
+      if($#argv < 3) goto arg3err;
+      set trans = ($argv[1] $argv[2] $argv[3]); shift;shift;shift;
+      breaksw
+
+    case "--force":
+     set ForceUpdate = 1
+     breaksw
+    case "--no-force":
+     set ForceUpdate = 0
+     breaksw
+
+    case "--log":
+      if($#argv < 1) goto arg1err;
+      set LF = $argv[1]; shift;
+      breaksw
+
+    case "--nolog":
+    case "--no-log":
+      set LF = /dev/null
+      breaksw
+
+    case "--tmp":
+    case "--tmpdir":
+      if($#argv < 1) goto arg1err;
+      set tmpdir = $argv[1]; shift;
+      set cleanup = 0;
+      breaksw
+
+    case "--cleanup":
+      set cleanup = 1;
+      breaksw
+
+    case "--no-cleanup":
+      set cleanup = 0;
+      breaksw
+
+    case "--save-warp":
+      set SaveWarp = 1;
+      breaksw
+
+    case "--no-save-warp":
+      set SaveWarp = 0;
+      breaksw	
+
+    case "--debug":
+      set verbose = 1;
+      set echo = 1;
+      breaksw
+
+    default:
+      echo ERROR: Flag $flag unrecognized. 
+      echo $cmdline
+      exit 1
+      breaksw
+  endsw
+
+end
+
+goto parse_args_return;
+############--------------##################
+
+############--------------##################
+check_params:
+
+if($#fovdir) then
+  if(! -e $fovdir) then
+    echo "ERROR: cannot find $fovdir"
+    exit 1
+  endif
+  set fovdir = `getfullpath $fovdir`
+  set smorphdir = $fovdir/synthmorph
+endif
+
+if($#subject) then
+  set invol = $SUBJECTS_DIR/$subject/mri/rawavg.mgz
+  if($#outdir == 0) set outdir = $SUBJECTS_DIR/$subject/mri/claustrum
+endif
+
+if($#invol == 0) then
+  echo "ERROR: must spec invol"
+  exit 1;
+endif
+if(! -e $invol) then
+  echo "ERROR: cannot find $invol"
+  exit 1;
+endif
+if($#outdir == 0) then
+  echo "ERROR: must spec outdir"
+  exit 1;
+endif
+
+if($#smorphdir) then
+  set mnilinreg = $smorphdir/reg.targ_to_invol.lta
+  # Assuming we want $MNITargetRes here and not 1.5mm hard coded.
+  # Could autodetect it
+  set mninonlinreg = $smorphdir/warp.to.mni152.$MNITargetRes.1.0mm.nii.gz
+  set mninonlininvreg = $smorphdir/warp.to.mni152.$MNITargetRes.1.0mm.inv.nii.gz
+  set flist = ($mnilinreg)
+  if($DoTest) set flist = ($flist $mninonlinreg $mninonlininvreg) 
+  foreach f ($flist)
+    if(-e $f) continue
+    echo "ERROR: cannot find $f"
+    exit 1
+  end
+  if(-d $outdir/synthmorph) then
+    echo "ERROR: synthmorph dir specified, but output already has a synthmorph folder"
+    exit 1
+  endif
+endif
+
+if($RequireConda) then
+  if($?CONDA_DEFAULT_ENV == 0) then
+    echo "ERROR: conda env is not active. Try running"
+    echo "conda activate synthseg_38"
+    exit 1
+  endif
+  if($CONDA_DEFAULT_ENV != synthseg_38) then
+    echo "ERROR: conda env is not synthseg_38. Try running"
+    echo "conda activate synthseg_38"
+    exit 1
+  endif
+endif
+
+goto check_params_return;
+############--------------##################
+
+############--------------##################
+arg1err:
+  echo "ERROR: flag $flag requires one argument"
+  exit 1
+############--------------##################
+arg2err:
+  echo "ERROR: flag $flag requires two arguments"
+  exit 1
+############--------------##################
+arg3err:
+  echo "ERROR: flag $flag requires three arguments"
+  exit 1
+############--------------##################
+
+############--------------##################
+usage_exit:
+  echo ""
+  echo "mri_claustrum_seg (requires about 22GB for seg itself, covers synthmorph)"
+  echo " --i invol"
+  echo " --o outdir"
+  echo " --s subject (sets invol=mri/rawavg.mgz, outdir=mri/claustrum but overriden with --o)"
+  echo " --synthmorphdir synthmorphdir : supply instead of computing "
+  echo " --threads threads"
+  echo " --lh, --rh : only do lh or rh (default is to do both)"
+  echo " --strip/--no-strip (default $DoStrip)"
+  echo " --surf/--no-surf (default $DoSurf)"
+  echo " --topo-correct/--no-topo-correct: topology correction on claustrum segmentation (default $DoTopoCorrection)"
+  echo " --post/--no-post : save posteriors (default $DoPost)"
+  echo " --qc/--no-qc: compute quality control score (default $DoTest)"
+  echo " --save-warp/--no-save-warp: save synthmorph warp if performing quality control (~180MB) (default $SaveWarp)"
+  echo " --fovdir fovdir : other claustrum dir to get fov"
+  echo " --manseg-lh manseglh : compute dice against manseglh"
+  echo " --manseg-rh mansegrh : compute dice against mansegrh"
+  echo " --trans dCmm dRmm dSmm : translation in mm when creating crop"
+  echo " --model model : use this model instead of default"
+  echo " --direct input output : run directly on input/output without preprocessing"
+  #echo " --python pythonpath : spec path to python (default is $python)"
+  #echo "    you can also set env var SYNTHSEG38"
+  echo " --rot rotC rotR rotS : rotation about the given axis in degrees"
+  echo " --mni-1.0 : set MNI Target res to 1.0 instead of $MNITargetRes (only applies when testing)"
+  echo ""
+
+  if(! $PrintHelp) exit 1;
+  echo $VERSION
+  cat $0 | awk 'BEGIN{prt=0}{if(prt) print $0; if($1 == "BEGINHELP") prt = 1 }'
+exit 1;
+
+#---- Everything below here is printed out as part of help -----# 
+BEGINHELP
+This script segments the claustrum from an input image of any modality and resolution.
+It first uses the synthmorph linear registration to register the input
+image to MNI152 space, to determine the appropriate FoV around clasutrum (right and left).
+It then segments the claustrum using a taylored synthseg model. 
+The output is a binary claustrum segmentation in the input image space. 
+There is also an option to save the posterior probabilities,
+and to perform a topological correction of the claustrum segmentation.
+
+The script can also compute Dice score against a manual segmentation that
+should be provided as input argument. It can also compute a quality control score by
+non linearly registering the segmentation to MNI space and comparing it
+to 18 provided high-resolution claustrum manual labels. The maximum Dice score
+among these comparisons is returned as quality control score.
+It can also create a surface representation of the claustrum in FreeSurfer format.
+
+If you use this code please cite
+  Mauri et al., 2024 "A Contrast-Agnostic Method for Ultra-High Resolution Claustrum Segmentation"
+  
+
+
+
+
