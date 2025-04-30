@@ -373,7 +373,7 @@ foreach hemi ($hemilist)
         if($status) goto error_exit
       endif
     end
-    set maxdice = $outdir/max.dice.$hemi.dat
+    set maxdice = $outdir/QCscore.max.dice.$hemi.dat
     set ud = `UpdateNeeded $maxdice $outdir/dice/*.$hemi.dat`
     if($ud || $ForceUpdate) then
       sort -nr $outdir/dice/*.$hemi.dat | head -n 1 > $maxdice
