@@ -9,27 +9,28 @@ If you use this method, please cite:
 
 ## Installation
 
-1. Clone this repository
+1. Clone this repository and the [SynthSeg repository](https://github.com/BBillot/SynthSeg.git)
 
 ```
-  git clone https://github.com/chiara-mauri/claustrum_segmentation.git
+git clone https://github.com/chiara-mauri/claustrum_segmentation.git
+git clone https://github.com/BBillot/SynthSeg.git
 ```
 
-2. Create a virtual environment (e.g. with conda) and install the required packages:
+2. Create a virtual environment (e.g. with conda) with python 3.8:
 
 ```
-conda create -n synthseg_38 python=3.8 tensorflow=2.2.0  keras=2.3.1 nibabel matplotlib -c anaconda -c conda-forge
+conda create -n synthseg_38 python=3.8 
 conda activate synthseg_38
 ```
 
-3. Clone the [SynthSeg repository](https://github.com/BBillot/SynthSeg.git) and install it in the conda environment
+3. Install SynthSeg in the conda environment. This will install all the required packages (e.g. tensorflow, keras)
 
 ```
-git clone https://github.com/BBillot/SynthSeg.git 
-pip install SynthSeg
+cd SynthSeg 
+pip install . 
 ```
 
-4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) version 7.5.0 or higher, and source it:
+4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) version 7.5.0 or higher (follow instructions), and source it:
 
 ```
 export FREESURFER_HOME=<freesurfer_installation_directory>/freesurfer
@@ -37,10 +38,10 @@ source $FREESURFER_HOME/SetUpFreeSurfer.sh
 ```
 This step is necessary for SynthMorph registration, to define the appropriate field of view around the claustrum and to perform quality control.
 
-## Segment claustrum in one command!
+## Now segment claustrum in one command!
 
 ```
-csh mri_claustrum_seg --i <inputImage> --o <outputDir> [--threads <Nthreads>  --qc   --topo-correct  --post  --surf]
+csh /path-to-repo/claustrum_segmentation/mri_claustrum_seg --i <inputImage> --o <outputDir> [--threads <Nthreads>  --qc   --topo-correct  --post  --surf]
 ```
 
 where:
