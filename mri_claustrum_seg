@@ -27,10 +27,11 @@ set mni152crop = $cdir/segs.warp.claustrum.prior.crop10.200um.nii.gz
 set reg200um = $cdir/reg.mni152.1.0mm-to-claustrum.crop10.200um.lta 
 set reg200umlrrev = $cdir/reg.mni152.1.0mm-to-claustrum.lrrev.crop10.200um.lta 
 set clrhctab = $cdir/claustrum.rh.ctab
+set mansubjectlist = $cdir/subject.list.txt
 
-set csegdir = $SCRIPT_DIR
+set csegdir = $SCRIPT_DIR/model
 set segr = $csegdir/claustrum-seg.py
-set mansubjectlist = $csegdir/subject.list.txt
+
 
 set MNITargetRes = 1.5mm 
 set ctab = $FREESURFER_HOME/FreeSurferColorLUT.txt
@@ -53,7 +54,7 @@ set fovdir = ()
 set RequireConda = 0
 set rot = ()
 set trans = ()
-set model = $SCRIPT_DIR/model/model.h5; 
+set model = $csegdir/model.h5; 
 
 set tmpdir = ();
 set cleanup = 1;
