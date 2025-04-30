@@ -43,4 +43,13 @@ where:
 - ```--post``` (optional) saves posteriors 
 - ```--surf``` (optional) computes surfaces
 
+Additional options are also available:  
+
+## Content
+
+- atlas
+- model 
+
+## Contact
+For any questions or comments, please raise an issue or contact cmauri@mgh.harvard.edu
  
