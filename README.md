@@ -11,19 +11,25 @@ If you use this method, please cite:
 
 1. Clone this repository
 
+```
+  git clone https://github.com/chiara-mauri/claustrum_segmentation.git
+```
+
 2. Create a virtual environment (e.g. with conda) and install the required packages:
 
 ```
 conda create -n synthseg_38 python=3.8 tensorflow=2.2.0  keras=2.3.1 nibabel matplotlib -c anaconda -c conda-forge
+conda activate synthseg_38
 ```
 
 3. Clone the [SynthSeg repository](https://github.com/BBillot/SynthSeg.git) and install it in the conda environment
 
 ```
-pip install SynthSeg-master
+git clone https://github.com/BBillot/SynthSeg.git 
+pip install SynthSeg
 ```
 
-4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) and source it:
+4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) version 7.5.0 or higher, and source it:
 
 ```
 export FREESURFER_HOME=<freesurfer_installation_directory>/freesurfer
