@@ -5,7 +5,7 @@ if(-e $FREESURFER_HOME/sources.csh) then
 endif
 
 
-#if($?SYNTHSEG38 == 0) setenv SYNTHSEG38 /autofs/space/mulan_001/users/chiara/miniforge3/envs/synthseg_38
+#if($?SYNTHSEG38 == 0) setenv SYNTHSEG38 /home/miniforge3/envs/synthseg_38
 #set python = $SYNTHSEG38/bin/python
 set python = python
 
