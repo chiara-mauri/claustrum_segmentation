@@ -1,4 +1,4 @@
-## Automatic claustrum segmentation
+## Automatic claustrum segmentation at high-resolution (0.35 mm isotropic)
 
 Please cite:
 
