@@ -14,20 +14,22 @@ If you use this method, please cite:
 2. Create a virtual environment (e.g. with conda) and install the required packages:
 
 ```
-#for CPU
-conda create -n synthseg_38 python=3.8 tensorflow=2.2.0 keras=2.3.1 nibabel matplotlib 
-
-#for GPU
-conda create -n synthseg_38 python=3.8 tensorflow-gpu=2.2.0 keras=2.3.1 nibabel matplotlib 
+conda create -n synthseg_38 python=3.8 tensorflow=2.2.0  keras=2.3.1 nibabel matplotlib -c anaconda -c conda-forge
 ```
 
-3. Clone the SynthSeg repository https://github.com/BBillot/SynthSeg.git and install it in the conda environment
+3. Clone the [SynthSeg repository](https://github.com/BBillot/SynthSeg.git) and install it in the conda environment
 
 ```
 pip install SynthSeg-master
 ```
 
-4. Install Freesurfer ...
+4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) and source it:
+
+```
+export FREESURFER_HOME=<freesurfer_installation_directory>/freesurfer
+source $FREESURFER_HOME/SetUpFreeSurfer.sh
+```
+This step is necessary for SynthMorph registration, to define the appropriate field of view around the claustrum and to perform quality control.
 
 ## Segment claustrum in one command!
 
@@ -52,6 +54,11 @@ Additional options are also available:
 - [mri_claustrum_seg](./mri_claustrum_seg) main script for segmenting claustrum
 - [atlas](./atlas/) contains the claustrum probabilistic prior in MNI152 space, as well as the high-resolution manual labels warped in MNI space, used to perform quality control
 - [model](./model/) contains the trained model and script for applying the model to a cropped input image
+
+
+## Training code
+
+The training code can be downloaded from the [SynthSeg repository](https://github.com/BBillot/SynthSeg.git)
 
 ## Contact
 For any questions or comments, please raise an issue or contact cmauri@mgh.harvard.edu
