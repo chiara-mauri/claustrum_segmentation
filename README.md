@@ -1,4 +1,4 @@
-Automatic claustrum segmentation
+## Automatic claustrum segmentation
 
 Please cite:
 
