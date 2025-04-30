@@ -1,5 +1,46 @@
-Method for claustrum segmentation
+Automatic claustrum segmentation
 
 Please cite:
 
 **A Constrast-Agnostic Method for Ultra-High Resolution Claustrum Segmentation**, Mauri, C., Fritz, R., Mora, J., Billot, B., Iglesias, J.E., Van Leemput, K., Augustinack, J., Greve, D.N., 2024. Preprint 	arXiv:2411.15388 [https://doi.org/10.48550/arXiv.2411.15388](https://arxiv.org/pdf/2411.15388)
+
+
+## Installation
+
+1. Clone this repository
+
+2. Create a virtual environment (e.g. with conda) and install the required packages:
+
+```
+#for CPU
+conda create -n synthseg_38 python=3.8 tensorflow=2.2.0 keras=2.3.1 nibabel matplotlib 
+
+#for GPU
+conda create -n synthseg_38 python=3.8 tensorflow-gpu=2.2.0 keras=2.3.1 nibabel matplotlib 
+```
+
+3. Clone the SynthSeg repository https://github.com/BBillot/SynthSeg.git and install it in the conda environment
+
+```
+pip install SynthSeg-master
+```
+
+4. Install Freesurfer ...
+
+## Segment claustrum
+
+```
+csh mri_claustrum_seg --i <inputImage> --o <outputDir> [--threads <Nthreads>  --qc   --topo-correct  --post  --surf]
+```
+
+where:
+
+- ```--i``` : input image
+- ```--o``` : output directory
+- ```--threads``` (optional): number of threads (default 1)
+- ```--qc``` (optional) performs quality control
+- ```--topo-correct``` (optional) performs topology correction on claustrum segmentation 
+- ```--post``` (optional) saves posteriors 
+- ```--surf``` (optional) computes surfaces
+
+ 
