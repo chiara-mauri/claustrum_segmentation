@@ -70,9 +70,9 @@ Additional options are also available (optional):
 
 ## Content of this repository
 
-- [mri_claustrum_seg](./mri_claustrum_seg) main script for segmenting claustrum
-- [atlas](./atlas/) contains the claustrum probabilistic prior in MNI152 space, as well as the high-resolution manual labels warped in MNI space, used to perform quality control
-- [model](./model/) contains the trained model and script for applying the model to a cropped input image
+- [mri_claustrum_seg](./mri_claustrum_seg): C shell script for segmenting claustrum
+- [atlas](./atlas/): folder containing the claustrum probabilistic prior in MNI152 space (used to crop the input image around claustrum), and the high-resolution manual labels warped in MNI space (used to perform quality control)
+- [model](./model/): folder containing the trained model and the python script for applying the model to a cropped input image
 
 
 ## Training code
