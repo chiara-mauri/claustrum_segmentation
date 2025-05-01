@@ -1,5 +1,7 @@
 ## Automatic claustrum segmentation at high-resolution (0.35 mm isotropic)
 
+
+
 If you use this method, please cite:
 
 **A Constrast-Agnostic Method for Ultra-High Resolution Claustrum Segmentation**, Mauri, C., Fritz, R., Mora, J., Billot, B., Iglesias, J.E., Van Leemput, K., Augustinack, J., Greve, D.N., 2024. Preprint 	arXiv:2411.15388 [https://doi.org/10.48550/arXiv.2411.15388](https://arxiv.org/pdf/2411.15388)
@@ -67,7 +69,7 @@ Additional options are also available (optional):
  - ```--mni-1.0``` : set MNI target resolution to 1mm instead of 1.5mm (only applies to quality control)"
 
 The method outputs a folder containing:
-- claustrum.rh.nii.gz, claustrum.lh.nii.gz: images with claustrum segmentation for right and left hemisphere respectively. Following the FreeSurfer LookupTable, right claustrum has ID 139, left claustrum has ID 138
+- claustrum.rh.nii.gz, claustrum.lh.nii.gz: images with claustrum segmentation at 0.35 mm isotropic resolution, for right and left hemisphere respectively. Following the FreeSurfer LookupTable, right claustrum has ID 139, left claustrum has ID 138
 - claustrum.prior.rh.nii.gz, claustrum.prior.lh.nii.gz: probabilistic atlas for right and left claustrum, linearly registered into subject space (used to crop the input image around claustrum)
 - seg.rh.stats, seg.lh.stats: files with right and left claustrum volumes (mm3)
 - synthmorph: folder with synthmorph registration to MNI152 space (nonlinear if using --qc, linear otherwise)
