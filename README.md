@@ -1,4 +1,4 @@
-## Automatic claustrum segmentation at high-resolution (0.35 mm isotropic)
+## Automatic contrast-agnostic claustrum segmentation at high-resolution (0.35 mm isotropic)
 
 ![ffge](readme_image.png)
 
