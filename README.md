@@ -1,4 +1,4 @@
-## Automatic contrast-agnostic claustrum segmentation at high-resolution (0.35 mm isotropic)
+# Automatic contrast-agnostic claustrum segmentation at high-resolution (0.35 mm isotropic)
 
 ![ffge](readme_image.png)
 
@@ -6,7 +6,8 @@ If you use this method, please cite:
 
 **A Constrast-Agnostic Method for Ultra-High Resolution Claustrum Segmentation**, Mauri, C., Fritz, R., Mora, J., Billot, B., Iglesias, J.E., Van Leemput, K., Augustinack, J., Greve, D.N., 2024. Preprint 	arXiv:2411.15388 [https://doi.org/10.48550/arXiv.2411.15388](https://arxiv.org/pdf/2411.15388)
 
-### Coming soon in the dev version of FreeSurfer with the command mri_segment_claustrum! 
+
+## Coming soon in the dev version of FreeSurfer with the command mri_segment_claustrum! 
 
 
 ## Installation
