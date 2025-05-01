@@ -1,6 +1,6 @@
 ## Automatic claustrum segmentation at high-resolution (0.35 mm isotropic)
 
-
+![ffge](readme_image.png)
 
 If you use this method, please cite:
 
