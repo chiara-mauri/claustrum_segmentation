@@ -70,11 +70,11 @@ Additional options are also available (optional):
  - ```--mni-1.0``` : set MNI target resolution to 1mm instead of 1.5mm (only applies to quality control)"
 
 The method outputs a folder containing:
-- claustrum.rh.nii.gz, claustrum.lh.nii.gz: images with claustrum segmentation at 0.35 mm isotropic resolution, for right and left hemisphere respectively. Following the FreeSurfer LookupTable, right claustrum has ID 139, left claustrum has ID 138
-- claustrum.prior.rh.nii.gz, claustrum.prior.lh.nii.gz: probabilistic atlas for right and left claustrum, linearly registered into subject space (used to crop the input image around claustrum)
-- seg.rh.stats, seg.lh.stats: files with right and left claustrum volumes (mm3)
-- synthmorph: folder with synthmorph registration to MNI152 space (nonlinear if using --qc, linear otherwise)
-- QCscore.max.dice.rh.dat, QCscore.max.dice.lh.dat: files with quality control scores for right and left hemispheres (if using --qc)
+- ```claustrum.rh.nii.gz, claustrum.lh.nii.gz```: images with claustrum segmentation at 0.35 mm isotropic resolution, for right and left hemisphere respectively. Following the FreeSurfer LookupTable, right claustrum has ID 139, left claustrum has ID 138
+- ```claustrum.prior.rh.nii.gz, claustrum.prior.lh.nii.gz```: probabilistic atlas for right and left claustrum, linearly registered into subject space (used to crop the input image around claustrum)
+- ```seg.rh.stats, seg.lh.stats```: files with right and left claustrum volumes (mm3)
+- ```synthmorph```: folder with synthmorph registration to MNI152 space (nonlinear if using --qc, linear otherwise)
+- ```QCscore.max.dice.rh.dat, QCscore.max.dice.lh.dat```: files with quality control scores for right and left hemispheres (if using --qc)
 
 
 
