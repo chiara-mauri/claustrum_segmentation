@@ -30,13 +30,13 @@ cd SynthSeg
 pip install . 
 ```
 
-4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) version 7.5.0 or higher (follow instructions), and source it:
+4. Install [Freesurfer](https://surfer.nmr.mgh.harvard.edu/fswiki/DownloadAndInstall) version 7.5.0 or higher (follow linked instructions), and source it:
 
 ```
 export FREESURFER_HOME=<freesurfer_installation_directory>/freesurfer
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 ```
-This step is necessary for SynthMorph registration, to define the appropriate field of view around the claustrum and to perform quality control.
+This last step is necessary for SynthMorph registration, to define the appropriate field of view around the claustrum and to perform quality control.
 
 ## Now segment claustrum in one command!
 
@@ -46,17 +46,29 @@ csh /path-to-repo/claustrum_segmentation/mri_claustrum_seg --i <inputImage> --o 
 
 where:
 
-- ```--i``` : input image
+- ```--i``` : input image (any contrast and resolution)
 - ```--o``` : output directory
 - ```--threads``` (optional): number of threads (default 1)
-- ```--qc``` (optional) performs quality control
-- ```--topo-correct``` (optional) performs topology correction on claustrum segmentation 
-- ```--post``` (optional) saves posteriors 
-- ```--surf``` (optional) computes surfaces
+- ```--qc/--no-qc``` (optional): compute quality control score (default --no-qc)
+- ```--topo-correct/--no-topo-correct``` (optional): perform post-hoc topology correction on the claustrum segmentation (default --no-topo-correct)
+- ```--post/no-post``` (optional): save posteriors (default --no-post)
+- ```--surf/no-surf``` (optional): compute surfaces (default --no-surf)
 
-Additional options are also available:  
+Additional options are also available (optional):  
 
-## Content
+  - ```--synthmorphdir <synthmorphdir>``` : supply directory with synthmorph registration instead of computing it
+  - ```--lh, --rh``` : only do left hemisphere or right hemisphere (default is to do both)
+  - ```--save-warp/--no-save-warp```: save synthmorph warp when performing quality control (~180MB) (default is --save-warp)
+  - ```--fovdir <fovdir>``` : supply the output directory of a claustrum segmentation to re-use the same field of view
+  - ```--manseg-lh <manseglh>``` : compute dice against a provided manual segmentation <manseglh> for left claustrum (it should have the same ID as in the automatic segmentation, i.e. 138)
+   - ```--manseg-rh <mansegrh>``` : compute dice against provided manual segmentation <mansegrh> for right claustrum (it should have the same ID as in the automatic segmentation, i.e. 139)
+ - ```--model <model>``` : use this model for claustrum segmentation instead of the default (requires training a model first)
+ - ```--direct <input> <output>``` : run directly on input/output without preprocessing
+ - ```--mni-1.0``` : set MNI target resolution to 1mm instead of 1.5mm (only applies to quality control)"
+
+
+
+## Content of this repository
 
 - [mri_claustrum_seg](./mri_claustrum_seg) main script for segmenting claustrum
 - [atlas](./atlas/) contains the claustrum probabilistic prior in MNI152 space, as well as the high-resolution manual labels warped in MNI space, used to perform quality control
