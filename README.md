@@ -4,7 +4,7 @@
 
 If you use this method, please cite:
 
-**A Constrast-Agnostic Method for Ultra-High Resolution Claustrum Segmentation**, Mauri, C., Fritz, R., Mora, J., Billot, B., Iglesias, J.E., Van Leemput, K., Augustinack, J., Greve, D.N., Mauri, Chiara, et al. "A Contrast‐Agnostic Method for Ultra‐High Resolution Claustrum Segmentation." Human Brain Mapping 46.12 (2025): e70303. [https://onlinelibrary.wiley.com/doi/pdf/10.1002/hbm.70303]
+**A Constrast-Agnostic Method for Ultra-High Resolution Claustrum Segmentation**, Mauri, C., Fritz, R., Mora, J., Billot, B., Iglesias, J.E., Van Leemput, K., Augustinack, J., Greve, D.N. Human Brain Mapping 46.12 (2025): e70303. [https://onlinelibrary.wiley.com/doi/pdf/10.1002/hbm.70303]
 
 
 ## Now in the dev version of FreeSurfer with the command mri_claustrum_seg! 
